@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}API Generated - CSV to API Converter{% endblock %}
+
+{% block content %}
+<h1 class="mb-4"><i class="bi bi-lightning-charge-fill me-2"></i>API Ready!</h1>
+<p class="lead mb-4 text-muted-light">
+    {# Toon de naam van de huidige dataset (slug) #}
+    Your CSV data ('{{ session.get('current_dataset_slug', 'data') }}') is now accessible via the API endpoints below. Use the configured parameters to filter the results.
+</p>
+
+{# --- Card for ALL Available Parameters --- #}
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <h4 class="card-title mb-3"><i class="bi bi-toggles me-2"></i>Configured Search Parameters</h4>
+        {% if selected_cols or multi_param_name %}
+            <p class="text-muted-light">You can filter the API results using the following parameters:</p>
+
+            {# --- Individuele Parameters --- #}
+            {% if selected_cols %}
+                <h5 class="mt-4 mb-3">Individual Filters:</h5>
+                <div class="table-responsive">
+                  <table class="table table-dark table-striped table-sm"> {# table-sm voor compactere weergave #}
+                    <thead>
+                      <tr>
+                        <th>Parameter Name (Column)</th>
+                        <th>Description</th>
+                        <th>Data Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for col in selected_cols %}
+                      <tr>
+                        <td><code>{{ col }}</code></td>
+                        <td>{{ descriptions.get(col, "No description.") }}</td>
+                        <td><span class="badge bg-info-subtle text-info-emphasis">{{ col_types.get(col, "Unknown")|capitalize }}</span></td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+            {% endif %}
+
+            {# --- Multi-Search Parameter --- #}
+            {% if multi_param_name %}
+            <h5 class="mt-4 mb-3">Multi-Column Keyword Search:</h5>
+            <div class="p-3 rounded" style="background-color: var(--dark-bg);">
+              <p class="mb-1">Parameter Name: <strong><code>{{ multi_param_name }}</code></strong></p>
+              <p class="mb-2">
+                <span class="text-muted-light">Description:</span> Searches for keywords across the content of the following columns:
+              </p>
+              <div>
+                {% for col in multi_search_cols %}
+                  <span class="badge bg-secondary me-1 mb-1">{{ col }}</span>
+                {% endfor %}
+              </div>
+               <p class="mt-2 mb-0"><small class="text-muted-light">Separate multiple keywords with spaces in your query value.</small></p>
+             </div>
+            {% endif %}
+
+            {# --- Example Query --- #}
+            <h5 class="mt-4 mb-2">Example API Query Structure:</h5>
+            {# Huidige dataset slug ophalen uit sessie, met fallback 'data' #}
+            {% set current_slug = session.get('current_dataset_slug', 'data') %}
+            {# Bouw lijst van parameters op #}
+            {% set example_params = selected_cols.copy() %}
+            {% if multi_param_name %}{% set _ = example_params.append(multi_param_name) %}{% endif %}
+
+            <code class="d-block bg-dark p-3 rounded text-white mb-2" style="font-size: 0.9em; word-wrap: break-word;">
+                {# Gebruik de nieuwe endpoint naam 'api_data_endpoint' en geef de slug mee #}
+                {% set base_url = ngrok_url ~ '/api/data/' ~ current_slug if ngrok_url else url_for('api_data_endpoint', dataset_slug=current_slug, _external=True) %}
+                {{ base_url }}?{% for param in example_params %}{{ param|urlencode }}=<span class="text-warning">VALUE</span>&{% endfor %}limit=<span class="text-info">50</span>&offset=<span class="text-info">0</span>&_sort=<span class="text-success">COLUMN_NAME</span>&_order=<span class="text-success">asc|desc</span>
+            </code>
+            <p><small class="text-muted-light">
+                Replace <code>VALUE</code>, <code>KEYWORDS</code>, <code>COLUMN_NAME</code> etc. with your desired search terms and options. Use <code>&</code> to combine parameters. Note: Parameter names with spaces need URL encoding (e.g., 'First%20Name').
+            </small></p>
+        {% else %}
+             {# Huidige dataset slug ophalen uit sessie, met fallback 'data' #}
+            {% set current_slug = session.get('current_dataset_slug', 'data') %}
+             {# Genereer de basis URL ook als er geen params zijn #}
+            {% set base_url = ngrok_url ~ '/api/data/' ~ current_slug if ngrok_url else url_for('api_data_endpoint', dataset_slug=current_slug, _external=True) %}
+            <p class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i> No search parameters were selected or configured.</p>
+            <p class="text-muted-light">The API endpoint <code>{{ base_url }}</code> will return all data (paginated). Go back to reconfigure parameters if needed.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# --- Local API Endpoint Card --- #}
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <h4 class="card-title mb-3"><i class="bi bi-pc-display me-2"></i>Local API Endpoint</h4>
+         <p class="text-muted-light">Access your API locally:</p>
+         <div class="api-url-display">
+             <strong>Local URL:</strong>
+             {# Huidige dataset slug ophalen uit sessie, met fallback 'data' #}
+             {% set current_slug = session.get('current_dataset_slug', 'data') %}
+             {# Gebruik de nieuwe endpoint naam 'api_data_endpoint' en geef de slug mee #}
+             {% set local_url = url_for('api_data_endpoint', dataset_slug=current_slug, _external=True) %}
+              {% if '127.0.0.1' in local_url %}{% set local_url = local_url.replace('127.0.0.1', request.host.split(':')[0]) %}{% endif %}
+             <code><a href="{{ local_url }}" target="_blank">{{ local_url }}</a></code>
+         </div>
+         <p class="mt-2"><small class="text-muted-light">Append parameters like <code>?limit=10&offset=0</code>.</small></p>
+    </div>
+</div>
+
+{# --- Public API Endpoint Card --- #}
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <h4 class="card-title mb-3"><i class="bi bi-globe2 me-2"></i>Public API Endpoint (via Ngrok)</h4>
+        {% if ngrok_url %}
+            <p>Your API is publicly accessible via Ngrok:</p>
+             {# Huidige dataset slug ophalen uit sessie, met fallback 'data' #}
+             {% set current_slug = session.get('current_dataset_slug', 'data') %}
+            <div class="alert alert-success api-url-display">
+                 <strong>Public URL (Temporary):</strong>
+                 {# Bouw de publieke URL op met de slug #}
+                 {% set public_api_url = ngrok_url ~ '/api/data/' ~ current_slug %}
+                 <code><a href="{{ public_api_url }}" target="_blank">{{ public_api_url }}</a></code>
+            </div>
+             <p class="mt-2"><small class="text-muted-light">Use this URL for external services like HALO. Append parameters as needed.</small></p>
+            <p class="mt-3 text-muted-light"><small><i class="bi bi-clock me-1"></i>Note: This public URL is temporary.</small></p>
+        {% else %}
+            <p>Make your API publicly accessible via Ngrok for external use (like HALO).</p>
+            <a href="{{ url_for('start_ngrok') }}" class="btn btn-warning btn-lg mt-2">
+                <i class="bi bi-rocket-takeoff me-2"></i>Start Public API (via Ngrok)
+            </a>
+            <p class="mt-3 text-muted-light"><small>Requires a free Ngrok account and authtoken.</small></p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="mt-5 d-flex justify-content-between">
+     <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+       <i class="bi bi-arrow-left me-2"></i>Start Over / Upload New
+     </a>
+     {# De 'Reconfigure' link moet alleen getoond worden als er data is om te reconfigureren #}
+     {% if selected_cols or multi_param_name %}
+     <a href="{{ url_for('analyze') }}" class="btn btn-outline-info">
+       <i class="bi bi-pencil-square me-2"></i>Reconfigure Parameters
+     </a>
+     {% endif %}
+</div>
+{% endblock %}

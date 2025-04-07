@@ -1,0 +1,6 @@
+version: 2
+tunnels:
+  secure-web:
+    proto: http
+    addr: 5000
+    inspect: false 

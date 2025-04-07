@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="text-center">
+    <h1 class="display-5 mb-4">CSV/PDF Hosting & API Converter</h1> {# Titel aangepast #}
+</div>
+
+<!-- What This Tool Does -->
+<div class="info-box-purple shadow-sm">
+    <i class="bi bi-info-circle-fill"></i>
+    <div>
+        <strong>What This Tool Does</strong><br>
+         Upload a <strong>CSV</strong> to convert it into a searchable API (local & public via Ngrok, configurable parameters).
+         Upload a <strong>PDF</strong> to host it and get a direct public link (via Ngrok) for sharing.
+         The public links are required for platforms like HALO.
+    </div>
+</div>
+
+<!-- Why Use This Tool -->
+<div class="info-box-light shadow-sm">
+    <h4><i class="bi bi-lightbulb"></i> Why Use This Tool?</h4>
+    <ul>
+        <li>Easily share CSV data via API or host PDF files for HALO</li>
+        <li>For CSV: Create searchable API parameters automatically (AI assisted)</li>
+        <li>For PDF: Get a simple, shareable public link</li>
+        <li>No complex server setup needed (uses temporary Ngrok tunnels)</li>
+        <li>Update data/files simply by uploading a new one</li>
+    </ul>
+</div>
+
+<!-- Upload Form -->
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <h2 class="card-title mb-3"><i class="bi bi-upload me-2"></i>Upload Your File</h2>
+        <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" id="upload-form">
+
+            <div class="mb-3">
+                <label class="form-label">1. Select File Type:</label><br>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="file_type" id="file_type_csv" value="csv" checked>
+                    <label class="form-check-label" for="file_type_csv">CSV (for API)</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="file_type" id="file_type_pdf" value="pdf">
+                    <label class="form-check-label" for="file_type_pdf">PDF (for Hosting)</label>
+                </div>
+            </div>
+
+             <div class="mb-3" id="context-input-group"> {# ID toegevoegd voor JS #}
+                <label for="dataset_context_input" class="form-label">2. Provide Dataset Context (for CSV):</label>
+                <input type="text" name="dataset_context" id="dataset_context_input" class="form-control" placeholder="E.g., 'Job vacancy data for HALO job matching'" required> {# Start als required #}
+                <div class="form-text text-muted-light mt-1">Required for CSV. Briefly describe the data/purpose (used by AI for descriptions).</div>
+            </div>
+
+            <div class="mb-3">
+                <label for="file" class="form-label"><span id="file-label-step">3</span>. Choose File:</label> {# Dynamisch stapnummer #}
+                <input type="file" name="file" class="form-control" id="file" accept=".csv,.pdf" required>
+                <div class="form-text text-muted-light mt-1">Select the CSV or PDF file.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">
+                <i class="bi bi-gear-fill me-2"></i>Upload and Process
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Functie om de status van het context-veld aan te passen
+  function toggleContextInput() {
+    const csvRadio = document.getElementById('file_type_csv');
+    const pdfRadio = document.getElementById('file_type_pdf');
+    const contextInput = document.getElementById('dataset_context_input');
+    const contextGroup = document.getElementById('context-input-group');
+    const fileLabelStep = document.getElementById('file-label-step');
+
+    if (pdfRadio.checked) {
+      // PDF geselecteerd: maak context optioneel en minder prominent
+      contextInput.required = false;
+      contextGroup.style.opacity = '0.6'; // Maak het wat vager
+      contextInput.placeholder = 'Context (Optional for PDF)';
+      fileLabelStep.textContent = '2'; // Stapnummer aanpassen
+      // Je zou het veld ook kunnen verbergen: contextGroup.style.display = 'none';
+    } else {
+      // CSV geselecteerd: maak context vereist en prominent
+      contextInput.required = true;
+      contextGroup.style.opacity = '1';
+      contextInput.placeholder = "E.g., 'Job vacancy data for HALO job matching'";
+      fileLabelStep.textContent = '3'; // Stapnummer terugzetten
+      // Zorg dat het zichtbaar is als je het verborgen had: contextGroup.style.display = 'block';
+    }
+  }
+
+  // Voeg event listeners toe aan de radio buttons
+  document.getElementById('file_type_csv').addEventListener('change', toggleContextInput);
+  document.getElementById('file_type_pdf').addEventListener('change', toggleContextInput);
+
+  // Roep de functie aan bij het laden van de pagina om de initiële staat correct in te stellen
+  document.addEventListener('DOMContentLoaded', toggleContextInput);
+</script>
+{% endblock %}

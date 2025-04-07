@@ -1,0 +1,322 @@
+/* static/style.css */
+:root {
+    --dark-bg: #1a1a2e; /* Deep dark blue/purple */
+    --primary-purple: #8a63d2; /* Main accent purple */
+    --light-blue-bg: #e0f2fe; /* Light blue for info box */
+    --text-light: #f8f9fa;
+    --text-muted-light: #adb5bd;
+    --card-bg: #2a2a4a; /* Darker card background */
+    --border-color: #444;
+  }
+
+  body {
+    background-color: var(--dark-bg);
+    color: var(--text-light);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+      color: var(--text-light);
+  }
+
+  /* --- General Card Styling --- */
+  .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      margin-bottom: 1.5rem;
+  }
+
+  .card-body {
+      padding: 1.5rem;
+  }
+
+  /* --- Info Box Styling --- */
+  .info-box-purple {
+      background-color: var(--primary-purple);
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 0.375rem; /* Bootstrap's default */
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+  }
+  .info-box-purple i {
+      font-size: 1.5rem;
+      margin-right: 0.75rem;
+  }
+
+  .info-box-light {
+      background-color: var(--light-blue-bg);
+      color: #0c5460; /* Dark text for light background */
+      border: 1px solid #bee5eb;
+      padding: 1rem 1.5rem;
+      border-radius: 0.375rem;
+      margin-bottom: 1.5rem;
+  }
+
+  .info-box-light h4 {
+      color: #0c5460;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+  }
+  .info-box-light h4 i {
+      font-size: 1.2rem;
+      margin-right: 0.5rem;
+  }
+
+  .info-box-light ul {
+      padding-left: 1.2rem; /* Indent list */
+      margin-bottom: 0; /* Remove default margin */
+  }
+
+  .info-box-light ul li {
+      margin-bottom: 0.4rem;
+      font-size: 0.95rem;
+  }
+
+  /* --- Step Indicator Styling --- */
+  .step-indicator {
+      text-align: center;
+      margin-bottom: 2rem; /* Space below description */
+  }
+
+  .step-icon-circle {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background-color: var(--card-bg);
+      border: 3px solid var(--primary-purple);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+      transition: all 0.3s ease;
+  }
+  .step-icon-circle:hover {
+      background-color: var(--primary-purple);
+      border-color: white;
+  }
+
+  .step-icon-circle i {
+      font-size: 2.5rem;
+      color: var(--primary-purple);
+  }
+  .step-icon-circle:hover i {
+      color: white;
+  }
+
+
+  .step-indicator h5 {
+      margin-bottom: 0.3rem;
+      font-weight: 600;
+      color: var(--text-light);
+  }
+
+  .step-indicator p {
+      font-size: 0.9rem;
+      color: var(--text-muted-light);
+      max-width: 250px; /* Limit width */
+      margin-left: auto;
+      margin-right: auto;
+  }
+
+  /* --- Form Styling --- */
+  .form-label {
+      color: var(--text-light);
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+  }
+
+  .form-control {
+      background-color: var(--dark-bg); /* Darker for better contrast */
+      border: 1px solid var(--border-color);
+      color: var(--text-light);
+  }
+  .form-control:focus {
+      background-color: var(--dark-bg);
+      border-color: var(--primary-purple);
+      color: var(--text-light);
+      box-shadow: 0 0 0 0.25rem rgba(138, 99, 210, 0.3); /* Purple focus glow */
+  }
+  .form-control::file-selector-button {
+      background-color: var(--primary-purple);
+      border: none;
+      color: white;
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.25rem;
+      margin-right: 1rem;
+      cursor: pointer;
+  }
+  .form-check-input {
+      background-color: var(--dark-bg);
+      border: 1px solid var(--border-color);
+  }
+  .form-check-input:checked {
+      background-color: var(--primary-purple);
+      border-color: var(--primary-purple);
+  }
+  .form-check-input:focus {
+       box-shadow: 0 0 0 0.25rem rgba(138, 99, 210, 0.3);
+       border-color: var(--primary-purple);
+  }
+  .form-switch .form-check-input {
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba(255,255,255,.25)'/%3e%3c/svg%3e");
+  }
+  .form-switch .form-check-input:focus {
+       background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%238a63d2'/%3e%3c/svg%3e");
+  }
+   .form-switch .form-check-input:checked {
+       background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+   }
+
+
+  /* --- Button Styling --- */
+  .btn-primary {
+      background-color: var(--primary-purple);
+      border-color: var(--primary-purple);
+  }
+  .btn-primary:hover {
+      background-color: #704db3; /* Darker purple */
+      border-color: #704db3;
+  }
+
+  .btn-warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #212529; /* Dark text for yellow */
+  }
+  .btn-warning:hover {
+      background-color: #e0a800;
+      border-color: #d39e00;
+  }
+
+  /* --- Table Styling --- */
+  .table {
+      --bs-table-bg: var(--card-bg);
+      --bs-table-border-color: var(--border-color);
+      --bs-table-color: var(--text-light);
+      --bs-table-striped-bg: #3a3a5a; /* Slightly different stripe */
+      --bs-table-striped-color: var(--text-light);
+      --bs-table-hover-bg: #4a4a6a;
+      --bs-table-hover-color: var(--text-light);
+      border-radius: 0.5rem; /* Apply radius to wrapper if using .table-responsive */
+      /* overflow: hidden; Ensure border radius applies to content */
+  }
+  .table-responsive {
+       border-radius: 0.5rem;
+       overflow: hidden; /* Clip table corners */
+  }
+
+
+  .table thead th {
+      background-color: #3a3a5a;
+      color: var(--text-light);
+      border-bottom: 2px solid var(--primary-purple);
+      white-space: nowrap; /* Voorkom dat headers afbreken */
+  }
+
+  .table td, .table th {
+      vertical-align: middle;
+      padding: 0.8rem 0.75rem; /* Iets meer padding */
+  }
+
+  .badge.bg-secondary {
+      background-color: #555 !important;
+      color: #eee;
+      padding: 0.4em 0.6em;
+      font-size: 0.8rem;
+  }
+  .badge.bg-info-subtle { /* Bootstrap 5.3 class */
+      padding: 0.4em 0.6em;
+      font-size: 0.8rem;
+  }
+
+  /* --- Link Styling --- */
+  a {
+      color: var(--primary-purple);
+      text-decoration: none;
+  }
+  a:hover {
+      color: #a584e0; /* Lighter purple on hover */
+      text-decoration: underline;
+  }
+
+  /* Progress Separator */
+  .progress-separator {
+      height: 2px;
+      background: linear-gradient(to right, var(--dark-bg), var(--primary-purple), var(--dark-bg));
+      border: none;
+      margin: 3rem 0;
+  }
+
+  /* API URL Display */
+  .api-url-display {
+      background-color: var(--dark-bg); /* Donkerder dan card */
+      padding: 1rem;
+      border-radius: 0.375rem;
+      border: 1px solid var(--border-color);
+      margin-bottom: 1.5rem;
+      word-wrap: break-word; /* Prevent long URLs from overflowing */
+  }
+  .api-url-display code {
+      color: #f8f9fa; /* Light text for code */
+      background-color: transparent; /* Don't need extra background */
+      padding: 0;
+      font-size: 1rem; /* Iets groter */
+  }
+  .api-url-display strong {
+      color: var(--text-muted-light);
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+  }
+
+  /* --- NIEUWE STIJLEN --- */
+
+  /* Stijlen voor de multi-select checkbox container in analyze.html */
+  .multi-select-container {
+    max-height: 250px; /* Maximale hoogte, pas aan indien nodig */
+    overflow-y: auto; /* Scrollbar indien nodig */
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    border-radius: 0.375rem; /* Standaard Bootstrap afronding */
+    background-color: var(--dark-bg); /* Iets donkerder dan card voor contrast */
+    margin-top: 0.5rem;
+  }
+  .multi-select-item {
+    display: block; /* Zorgt dat elk item op een nieuwe regel staat */
+    margin-bottom: 0.5rem;
+  }
+  .multi-select-item .form-check-input {
+      margin-right: 0.5rem;
+      vertical-align: middle; /* Lijn checkbox uit met tekst */
+  }
+  .multi-select-item label {
+      font-weight: normal; /* Standaard label gewicht */
+      color: var(--text-light);
+      cursor: pointer;
+      vertical-align: middle;
+  }
+
+  /* Stijlen voor inkorten van tekst in tabelcellen analyze.html */
+  .col-description, .col-samples {
+    max-width: 300px; /* Maximale breedte, pas aan indien nodig */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: help; /* Muiscursor om aan te geven dat je kunt hoveren voor tooltip */
+    vertical-align: middle;
+  }
+  .col-samples .badge { /* Zorg dat badges binnen de limiet blijven */
+      max-width: 100px; /* Max breedte per badge */
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle; /* Lijn badges mooi uit */
+      cursor: default; /* Standaard cursor voor badges */
+      margin-bottom: 2px; /* Kleine marge onder badges */
+      margin-top: 2px;
+  }

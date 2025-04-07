@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Setup Ngrok - CSV to API Converter{% endblock %}
+
+{% block content %}
+<h1 class="mb-4"><i class="bi bi-key-fill me-2"></i>Setup Ngrok Authtoken</h1>
+<p class="lead mb-4 text-muted-light">To create a public URL for your API, Ngrok needs an authentication token linked to your account.</p>
+
+<div class="card shadow">
+    <div class="card-body">
+        <form action="{{ url_for('start_ngrok') }}" method="post">
+             <div class="mb-3">
+                <label for="auth_token" class="form-label">Ngrok Authtoken</label>
+                <input type="password" class="form-control form-control-lg" name="auth_token" id="auth_token" placeholder="Enter your Ngrok authtoken" required>
+                <div class="form-text text-muted-light mt-2">
+                    You can find your authtoken on your <a href="https://dashboard.ngrok.com/get-started/your-authtoken" target="_blank" class="link-light">Ngrok dashboard</a> after signing up (it's free).
+                    This token is only needed once to configure Ngrok on this machine.
+                </div>
+            </div>
+             <button type="submit" class="btn btn-warning btn-lg w-100"><i class="bi bi-rocket-takeoff me-2"></i>Configure Token and Start Tunnel</button>
+        </form>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('generate_api') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-2"></i>Back to API Details</a>
+</div>
+{% endblock %}

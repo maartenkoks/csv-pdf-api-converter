@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}PDF Ready - CSV to API Converter{% endblock %}
+
+{% block content %}
+<h1 class="mb-4"><i class="bi bi-file-earmark-pdf-fill me-2"></i>PDF Ready!</h1>
+<p class="lead mb-4 text-muted-light">
+    Your uploaded PDF file is now being hosted. You can use the links below to access it.
+</p>
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <h4 class="card-title mb-3"><i class="bi bi-file-pdf me-2"></i>Uploaded File</h4>
+        <p><strong>Filename:</strong> {{ filename }}</p>
+    </div>
+</div>
+
+
+{# --- Local URL Card --- #}
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <h4 class="card-title mb-3"><i class="bi bi-pc-display me-2"></i>Local PDF Link</h4>
+         <p class="text-muted-light">Access your PDF locally (only works on this machine or others on the same network):</p>
+         <div class="api-url-display"> {# Hergebruik CSS class voor consistentie #}
+             <strong>Local URL:</strong>
+             {% if local_pdf_url and not local_pdf_url.startswith('#error') %}
+                 <code><a href="{{ local_pdf_url }}" target="_blank">{{ local_pdf_url }}</a></code>
+             {% else %}
+                 <code class="text-danger">Error generating local URL.</code>
+             {% endif %}
+         </div>
+         <p class="mt-2"><small class="text-muted-light">This link points directly to the PDF file.</small></p>
+    </div>
+</div>
+
+{# --- Public URL Card --- #}
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <h4 class="card-title mb-3"><i class="bi bi-globe2 me-2"></i>Public PDF Link (via Ngrok)</h4>
+        {% if ngrok_running %}
+            <p>Your PDF should be publicly accessible via Ngrok:</p>
+            {% if public_pdf_url and not public_pdf_url.startswith('#error') %}
+                <div class="alert alert-success api-url-display">
+                     <strong>Public URL (Temporary):</strong>
+                     <code><a href="{{ public_pdf_url }}" target="_blank">{{ public_pdf_url }}</a></code>
+                </div>
+                <p class="mt-2"><small class="text-muted-light">Use this URL for external services like HALO that require public access.</small></p>
+            {% else %}
+                 <div class="alert alert-danger api-url-display">
+                     <strong>Public URL Error:</strong>
+                     <code class="text-danger">Could not generate public URL even though Ngrok seems to be running. Check Ngrok status/logs.</code>
+                </div>
+            {% endif %}
+            <p class="mt-3 text-muted-light"><small><i class="bi bi-clock me-1"></i>Note: This public URL is temporary and will stop working when you close this application or the Ngrok tunnel.</small></p>
+        {% else %}
+            <p>To share your PDF with external platforms like HALO, make it publicly accessible via Ngrok.</p>
+            <a href="{{ url_for('start_ngrok') }}" class="btn btn-warning btn-lg mt-2">
+                <i class="bi bi-rocket-takeoff me-2"></i>Start Public Access (via Ngrok)
+            </a>
+            <p class="mt-3 text-muted-light"><small>This requires a free Ngrok account and its authtoken. The public URL is needed for HALO.</small></p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="mt-5 d-flex justify-content-between">
+     <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+       <i class="bi bi-arrow-left me-2"></i>Upload Another File
+     </a>
+     {# Geen 'Reconfigure' knop nodig voor PDF #}
+</div>
+{% endblock %}

@@ -1,5 +1,8 @@
 import openai
-openai.api_key = "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"
-models = openai.Model.list()
-for m in models['data']:
-    print(m['id'])
+# API key should be loaded from environment variables, not hardcoded
+# openai.api_key = "YOUR_API_KEY"
+
+# Example code to list models (commented out for safety)
+# models = openai.Model.list()
+# for m in models['data']:
+#     print(m['id'])

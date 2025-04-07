@@ -53,7 +53,13 @@ De applicatie kan lokaal worden gedraaid en maakt gebruik van Ngrok (tijdens lok
     pip install python-dotenv chardet openai werkzeug jinja2
     ```
 
-4.  **Configureer Environment Variabelen:**
+4.  **Installeer en configureer Ngrok (nodig voor publieke toegang):**
+    *   Download Ngrok van [ngrok.com/download](https://ngrok.com/download)
+    *   Plaats het `ngrok.exe` bestand in de hoofdmap van het project (naast `app.py`)
+    *   Maak een gratis account aan op [ngrok.com](https://ngrok.com) om een authtoken te krijgen
+    *   Je hebt deze authtoken nodig wanneer je de publieke toegang wilt starten via de applicatie
+
+5.  **Configureer Environment Variabelen:**
     *   Kopieer `.env.example` naar een nieuw bestand genaamd `.env`:
         ```bash
         # Op Windows:
@@ -166,4 +172,8 @@ pip install python-dotenv chardet openai werkzeug jinja2
 
 3. **LLM features disabled waarschuwing**: Dit is normaal als je geen OpenAI API key hebt ingesteld. De applicatie werkt nog steeds, maar zonder AI-gegenereerde kolombeschrijvingen.
 
-4. **Problemen met Ngrok**: Zorg ervoor dat je een geldige Ngrok authtoken hebt. Je kunt een gratis account aanmaken op [ngrok.com](https://ngrok.com).
+4. **Problemen met Ngrok**:
+   - **Ngrok niet gevonden**: Zorg ervoor dat `ngrok.exe` in de hoofdmap van het project staat (naast `app.py`). Download het van [ngrok.com/download](https://ngrok.com/download) als je het nog niet hebt.
+   - **Ongeldige authtoken**: Zorg ervoor dat je een geldige Ngrok authtoken hebt. Je kunt een gratis account aanmaken op [ngrok.com](https://ngrok.com) om een token te krijgen.
+   - **Ngrok start niet**: Controleer of poort 5000 niet al in gebruik is door een andere applicatie. Probeer de applicatie te herstarten.
+   - **Ngrok tunnel niet gevonden**: Soms duurt het even voordat de tunnel is opgezet. Wacht een paar seconden en probeer het opnieuw.

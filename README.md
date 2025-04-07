@@ -1,8 +1,8 @@
 # CSV/PDF to API Converter & Hoster
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![Flask Version](https://img.shields.io/badge/flask-3.0+-teal.svg)](https://flask.palletsprojects.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) <!-- Optioneel -->
+[![Flask Version](https://img.shields.io/badge/flask-2.3.2-teal.svg)](https://flask.palletsprojects.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Beschrijving
 
@@ -48,6 +48,11 @@ De applicatie kan lokaal worden gedraaid en maakt gebruik van Ngrok (tijdens lok
     pip install -r requirements.txt
     ```
 
+    **Let op:** Als je problemen ondervindt met ontbrekende dependencies, zorg ervoor dat je alle benodigde packages installeert:
+    ```bash
+    pip install python-dotenv chardet openai werkzeug jinja2
+    ```
+
 4.  **Configureer Environment Variabelen:**
     *   Kopieer `.env.example` naar een nieuw bestand genaamd `.env`:
         ```bash
@@ -62,16 +67,25 @@ De applicatie kan lokaal worden gedraaid en maakt gebruik van Ngrok (tijdens lok
           python -c 'import secrets; print(secrets.token_hex(16))'
           ```
           Plak de gegenereerde string in het `.env` bestand.
-        *   `OPENAI_API_KEY`: Vul je eigen OpenAI API key in (beginnend met `sk-...`).
+        *   `OPENAI_API_KEY`: Vul je eigen OpenAI API key in (beginnend met `sk-...`). Als je geen OpenAI API key hebt of deze functionaliteit niet wilt gebruiken, kun je dit veld leeg laten. De applicatie zal dan werken zonder de AI-gegenereerde kolombeschrijvingen.
 
 ## Lokaal Draaien
 
 1.  **Zorg dat je virtual environment geactiveerd is.**
-2.  **Start de Flask Development Server:**
+2.  **Navigeer naar de juiste directory:**
+    ```bash
+    cd csv-pdf-api-converter
+    ```
+3.  **Start de Flask Development Server:**
     ```bash
     python app.py
     ```
-3.  Open je webbrowser en ga naar `http://127.0.0.1:5000` (of het adres dat in de terminal wordt getoond).
+
+    Als je een foutmelding krijgt over een ontbrekend bestand, zorg ervoor dat je in de juiste directory staat. Je kunt ook het volledige pad naar het bestand gebruiken:
+    ```bash
+    python /volledig/pad/naar/csv-pdf-api-converter/app.py
+    ```
+4.  Open je webbrowser en ga naar `http://127.0.0.1:5000` (of het adres dat in de terminal wordt getoond).
 
 ## Gebruik
 
@@ -122,4 +136,34 @@ De volgende environment variabelen worden gebruikt (zie `.env.example`):
 
 ## Dependencies
 
-Zie `requirements.txt`.
+Zie `requirements.txt` voor de volledige lijst van dependencies. De belangrijkste zijn:
+
+* pandas==2.2.1
+* numpy==1.26.4
+* flask==2.3.2
+* requests==2.31.0
+* python-dotenv==1.0.1
+* chardet==5.2.0
+* openai==1.70.0
+* werkzeug==3.1.3
+* jinja2==3.1.6
+
+## Troubleshooting
+
+### Ontbrekende Dependencies
+
+Als je foutmeldingen krijgt over ontbrekende modules, installeer dan de ontbrekende dependencies:
+
+```bash
+pip install python-dotenv chardet openai werkzeug jinja2
+```
+
+### Problemen met het starten van de applicatie
+
+1. **Foutmelding "No such file or directory"**: Zorg ervoor dat je in de juiste directory staat wanneer je `python app.py` uitvoert. Gebruik het volledige pad indien nodig.
+
+2. **Foutmelding over ontbrekende .env file**: Kopieer het `.env.example` bestand naar `.env` en vul de benodigde waarden in.
+
+3. **LLM features disabled waarschuwing**: Dit is normaal als je geen OpenAI API key hebt ingesteld. De applicatie werkt nog steeds, maar zonder AI-gegenereerde kolombeschrijvingen.
+
+4. **Problemen met Ngrok**: Zorg ervoor dat je een geldige Ngrok authtoken hebt. Je kunt een gratis account aanmaken op [ngrok.com](https://ngrok.com).

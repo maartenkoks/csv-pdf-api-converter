@@ -44,6 +44,13 @@
                     <input class="form-check-input" type="radio" name="file_type" id="file_type_pdf" value="pdf">
                     <label class="form-check-label" for="file_type_pdf">PDF (for Hosting)</label>
                 </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="file_type" id="file_type_json" value="json">
+                    <label class="form-check-label" for="file_type_json">JSON (for API)</label>
+                </div>
+                <div class="form-text text-muted-light mt-1" id="json-help" style="display:none;">
+                    JSON must be an array of objects (or NDJSON, one object per line).
+                </div>
             </div>
 
              <div class="mb-3" id="context-input-group"> {# ID toegevoegd voor JS #}
@@ -69,6 +76,8 @@
 {% block scripts %}
 <script>
   // Functie om de status van het context-veld aan te passen
+  const jsonRadio = document.getElementById('file_type_json');
+  const jsonHelp = document.getElementById('json-help');
   function toggleContextInput() {
     const csvRadio = document.getElementById('file_type_csv');
     const pdfRadio = document.getElementById('file_type_pdf');
@@ -82,20 +91,28 @@
       contextGroup.style.opacity = '0.6'; // Maak het wat vager
       contextInput.placeholder = 'Context (Optional for PDF)';
       fileLabelStep.textContent = '2'; // Stapnummer aanpassen
-      // Je zou het veld ook kunnen verbergen: contextGroup.style.display = 'none';
+      jsonHelp.style.display = 'none';
+    } else if (jsonRadio.checked) {
+      // JSON geselecteerd: maak context optioneel en minder prominent, toon helptekst
+      contextInput.required = false;
+      contextGroup.style.opacity = '0.6';
+      contextInput.placeholder = 'Context (Optional for JSON)';
+      fileLabelStep.textContent = '2';
+      jsonHelp.style.display = 'block';
     } else {
       // CSV geselecteerd: maak context vereist en prominent
       contextInput.required = true;
       contextGroup.style.opacity = '1';
       contextInput.placeholder = "E.g., 'Job vacancy data for HALO job matching'";
       fileLabelStep.textContent = '3'; // Stapnummer terugzetten
-      // Zorg dat het zichtbaar is als je het verborgen had: contextGroup.style.display = 'block';
+      jsonHelp.style.display = 'none';
     }
   }
 
   // Voeg event listeners toe aan de radio buttons
   document.getElementById('file_type_csv').addEventListener('change', toggleContextInput);
   document.getElementById('file_type_pdf').addEventListener('change', toggleContextInput);
+  document.getElementById('file_type_json').addEventListener('change', toggleContextInput);
 
   // Roep de functie aan bij het laden van de pagina om de initiële staat correct in te stellen
   document.addEventListener('DOMContentLoaded', toggleContextInput);

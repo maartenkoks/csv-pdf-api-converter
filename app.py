@@ -13,6 +13,7 @@ import re
 import logging
 from dotenv import load_dotenv
 from openai import OpenAI, RateLimitError, APIError, AuthenticationError
+from load_json import load_json
 
 load_dotenv()
 
@@ -24,8 +25,8 @@ app.config['TEMP_FOLDER'] = 'temp_uploads'
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s')
 logger = app.logger
 
-if not os.path.exists(app.config['UPLOAD_FOLDER']): os.makedirs(app.config['UPLOAD_FOLDER'])
-if not os.path.exists(app.config['TEMP_FOLDER']): os.makedirs(app.config['TEMP_FOLDER'])
+for d in ["data", "uploads", "temp_uploads"]:
+    os.makedirs(d, exist_ok=True)
 
 # --- Globale variabelen ---
 DATAFRAME_STORAGE = None; SELECTED_COLS = []; COL_DESCRIPTIONS = {}
@@ -164,6 +165,36 @@ def upload_file():
         except Exception as e: logger.error(f"Error saving PDF '{filename}': {e}", exc_info=True); return redirect(url_for("index"))
     else: logger.warning(f"Invalid file type: {file_type}"); return redirect(url_for("index"))
 
+    # --- JSON upload ---
+    if file_type == "json":
+        json_dir = os.path.join("data")
+        os.makedirs(json_dir, exist_ok=True)
+        json_path = os.path.join(json_dir, "input.json")
+        uploaded_file.save(json_path)
+        logger.info(f"JSON saved: {json_path}")
+        df = load_json(json_path)
+        if df is None or df.empty:
+            logger.error(f"JSON load failed: {json_path}")
+            return redirect(url_for('index'))
+        global DATAFRAME_STORAGE, COL_TYPES_CACHE, COL_SAMPLES_CACHE, SELECTED_COLS, MULTI_SEARCH_PARAM_NAME, MULTI_SEARCH_COLS, COL_DESCRIPTIONS
+        DATAFRAME_STORAGE = df
+        COL_TYPES_CACHE = {}
+        COL_SAMPLES_CACHE = {}
+        SELECTED_COLS = list(df.columns)
+        MULTI_SEARCH_PARAM_NAME = None
+        MULTI_SEARCH_COLS = []
+        COL_DESCRIPTIONS = {}
+        analyze_columns_for_display(DATAFRAME_STORAGE)
+        # Verwijder eventueel een bestaand input.csv
+        csv_path = os.path.join(json_dir, "input.csv")
+        if os.path.exists(csv_path):
+            try:
+                os.remove(csv_path)
+                logger.info(f"Removed old CSV: {csv_path}")
+            except Exception as e_rem:
+                logger.error(f"Error removing CSV {csv_path}: {e_rem}")
+        return redirect(url_for("analyze"))
+
 # --- Functie: analyze_columns_for_display ---
 def analyze_columns_for_display(df):
     global COL_TYPES_CACHE, COL_SAMPLES_CACHE
@@ -192,18 +223,30 @@ def analyze_columns_for_display(df):
 @app.route("/analyze")
 def analyze():
     global DATAFRAME_STORAGE, SELECTED_COLS, MULTI_SEARCH_PARAM_NAME, MULTI_SEARCH_COLS, COL_TYPES_CACHE, COL_SAMPLES_CACHE, COL_DESCRIPTIONS
-    if DATAFRAME_STORAGE is None or session.get("file_type") != "csv": return redirect(url_for("index"))
-    if not COL_TYPES_CACHE or not COL_SAMPLES_CACHE: analyze_columns_for_display(DATAFRAME_STORAGE)
+    if DATAFRAME_STORAGE is None or session.get("file_type") not in ["csv", "json"]:
+        return redirect(url_for("index"))
+    if not COL_TYPES_CACHE or not COL_SAMPLES_CACHE:
+        analyze_columns_for_display(DATAFRAME_STORAGE)
     all_columns = list(DATAFRAME_STORAGE.columns)
     full_descriptions = { col: COL_DESCRIPTIONS.get(col) or guess_description(col) for col in all_columns }
     logger.debug(f"Rendering analyze.html: {len(all_columns)} cols")
-    return render_template( "analyze.html", all_columns=all_columns, col_types=COL_TYPES_CACHE, samples=COL_SAMPLES_CACHE, col_descriptions=full_descriptions, current_selected_cols=SELECTED_COLS, current_multi_param_name=MULTI_SEARCH_PARAM_NAME, current_multi_selected_cols=MULTI_SEARCH_COLS )
+    return render_template(
+        "analyze.html",
+        all_columns=all_columns,
+        col_types=COL_TYPES_CACHE,
+        samples=COL_SAMPLES_CACHE,
+        col_descriptions=full_descriptions,
+        current_selected_cols=SELECTED_COLS,
+        current_multi_param_name=MULTI_SEARCH_PARAM_NAME,
+        current_multi_selected_cols=MULTI_SEARCH_COLS
+    )
 
 # --- Route: Select Columns & Multi-Search Config ---
 @app.route("/select_columns_and_configure_multi", methods=["POST"])
 def select_columns_and_configure_multi():
     global SELECTED_COLS, MULTI_SEARCH_PARAM_NAME, MULTI_SEARCH_COLS, DATAFRAME_STORAGE
-    if DATAFRAME_STORAGE is None or session.get("file_type") != "csv": return redirect(url_for("index"))
+    if DATAFRAME_STORAGE is None or session.get("file_type") not in ["csv", "json"]:
+        return redirect(url_for("index"))
     SELECTED_COLS = request.form.getlist("selected_cols"); logger.info(f"Selected cols: {SELECTED_COLS}")
     enable_multi = request.form.get("enable_multi_search")
     if enable_multi:
@@ -223,7 +266,8 @@ def select_columns_and_configure_multi():
 @app.route("/generate")
 def generate_api():
     global DATAFRAME_STORAGE, SELECTED_COLS, COL_DESCRIPTIONS, COL_TYPES_CACHE, COL_SAMPLES_CACHE, NGROK_URL, MULTI_SEARCH_PARAM_NAME, MULTI_SEARCH_COLS
-    if DATAFRAME_STORAGE is None or session.get("file_type") != "csv": return redirect(url_for("index"))
+    if DATAFRAME_STORAGE is None or session.get("file_type") not in ["csv", "json"]:
+        return redirect(url_for("index"))
     final_descriptions = { col: COL_DESCRIPTIONS.get(col) or guess_description(col) for col in SELECTED_COLS }
     multi_col_details = {}
     if MULTI_SEARCH_PARAM_NAME and MULTI_SEARCH_COLS:
@@ -277,70 +321,101 @@ def parse_int_param(param_value, default, min_val, max_val):
 
 # --- API Endpoint: /api/data/<slug> (met verbeterde limit/offset parsing) ---
 @app.route("/api/data/<string:dataset_slug>", methods=["GET"])
-def api_data_endpoint(dataset_slug):
+def api_data_endpoint(dataset_slug=None):
     global DATAFRAME_STORAGE, SELECTED_COLS, MULTI_SEARCH_PARAM_NAME, MULTI_SEARCH_COLS, COL_TYPES_CACHE
-
-    if DATAFRAME_STORAGE is None: logger.warning(f"/api/data/{dataset_slug}: No DF loaded."); return jsonify({"error": "No CSV data currently loaded."}), 400
-    current_slug_in_session = session.get("current_dataset_slug")
-    if current_slug_in_session and dataset_slug != current_slug_in_session: logger.warning(f"API slug mismatch: URL='{dataset_slug}', Session='{current_slug_in_session}'. Serving session data.")
-
+    if DATAFRAME_STORAGE is None:
+        logger.warning(f"/api/data: No DF loaded.")
+        return jsonify({"error": "No data currently loaded."}), 400
+    # Slug wordt genegeerd, altijd dezelfde data
     try:
-        df_filtered = DATAFRAME_STORAGE.copy(); original_columns = list(df_filtered.columns); query_params_used = {}
-        allowed_params = set(SELECTED_COLS);
-        if MULTI_SEARCH_PARAM_NAME: allowed_params.add(MULTI_SEARCH_PARAM_NAME)
+        df_filtered = DATAFRAME_STORAGE.copy()
+        original_columns = list(df_filtered.columns)
+        query_params_used = {}
+        allowed_params = set(SELECTED_COLS)
+        if MULTI_SEARCH_PARAM_NAME:
+            allowed_params.add(MULTI_SEARCH_PARAM_NAME)
         always_allowed_params = {"limit", "offset", "_sort", "_order"}
         invalid_params = [p for p in request.args if p not in allowed_params and p not in always_allowed_params]
-        if invalid_params: return jsonify({"error": f"Invalid param(s): {', '.join(invalid_params)}. Allowed: {', '.join(sorted(list(allowed_params | always_allowed_params)))}"}), 400
-
+        if invalid_params:
+            return jsonify({"error": f"Invalid param(s): {', '.join(invalid_params)}. Allowed: {', '.join(sorted(list(allowed_params | always_allowed_params)))}"}), 400
         # Filtering
         for col in SELECTED_COLS:
             if col in request.args:
-                val = request.args.get(col);
+                val = request.args.get(col)
                 if val is not None and val.strip() != '':
                     query_params_used[col] = val
-                    try: df_filtered = df_filtered[df_filtered[col].astype(str).str.contains(val, case=False, na=False, regex=False)]
-                    except Exception as filter_err: logger.error(f"Filter err col '{col}': {filter_err}"); return jsonify({"error": f"Filter failed for '{col}'."}), 500
-                    if df_filtered.empty: break
-
+                    try:
+                        df_filtered = df_filtered[df_filtered[col].astype(str).str.contains(val, case=False, na=False, regex=False)]
+                    except Exception as filter_err:
+                        logger.error(f"Filter err col '{col}': {filter_err}")
+                        return jsonify({"error": f"Filter failed for '{col}'."}), 500
+                    if df_filtered.empty:
+                        break
         # Multi-search
         if not df_filtered.empty and MULTI_SEARCH_PARAM_NAME and MULTI_SEARCH_PARAM_NAME in request.args:
-             multi_query = request.args.get(MULTI_SEARCH_PARAM_NAME, "").strip()
-             if multi_query and MULTI_SEARCH_COLS:
-                 keywords = [kw.strip() for kw in multi_query.lower().split() if kw.strip()]
-                 if keywords:
-                     query_params_used[MULTI_SEARCH_PARAM_NAME] = multi_query; final_mask = pd.Series(True, index=df_filtered.index)
-                     for kw in keywords:
-                         keyword_mask = pd.Series(False, index=df_filtered.index)
-                         for col in MULTI_SEARCH_COLS:
-                             if col in df_filtered.columns:
-                                 try: keyword_mask |= df_filtered[col].astype(str).str.contains(kw, case=False, na=False, regex=False)
-                                 except Exception as multi_err: logger.warning(f"Multi err col '{col}': {multi_err}", exc_info=False)
-                         final_mask &= keyword_mask
-                         if not final_mask.any(): break
-                     df_filtered = df_filtered[final_mask]
-
+            multi_query = request.args.get(MULTI_SEARCH_PARAM_NAME, "").strip()
+            if multi_query and MULTI_SEARCH_COLS:
+                keywords = [kw.strip() for kw in multi_query.lower().split() if kw.strip()]
+                if keywords:
+                    query_params_used[MULTI_SEARCH_PARAM_NAME] = multi_query
+                    final_mask = pd.Series(True, index=df_filtered.index)
+                    for kw in keywords:
+                        keyword_mask = pd.Series(False, index=df_filtered.index)
+                        for col in MULTI_SEARCH_COLS:
+                            if col in df_filtered.columns:
+                                try:
+                                    keyword_mask |= df_filtered[col].astype(str).str.contains(kw, case=False, na=False, regex=False)
+                                except Exception as multi_err:
+                                    logger.warning(f"Multi err col '{col}': {multi_err}", exc_info=False)
+                        final_mask &= keyword_mask
+                        if not final_mask.any():
+                            break
+                    df_filtered = df_filtered[final_mask]
         # Sorting
-        sort_by = request.args.get('_sort'); order = request.args.get('_order', 'asc').lower(); ascending = order == 'asc'
+        sort_by = request.args.get('_sort')
+        order = request.args.get('_order', 'asc').lower()
+        ascending = order == 'asc'
         if sort_by and sort_by in df_filtered.columns:
-             try: query_params_used['_sort'] = sort_by; query_params_used['_order'] = order; df_filtered = df_filtered.sort_values(by=sort_by, ascending=ascending, key=pd.to_numeric if COL_TYPES_CACHE.get(sort_by) in ['number', 'integer'] else None, na_position='last')
-             except Exception as sort_err: logger.warning(f"Sort err '{sort_by}': {sort_err}."); query_params_used.pop('_sort', None); query_params_used.pop('_order', None)
-
-        # --- NIEUW: Paginatie met helper functie ---
+            try:
+                query_params_used['_sort'] = sort_by
+                query_params_used['_order'] = order
+                df_filtered = df_filtered.sort_values(by=sort_by, ascending=ascending, key=pd.to_numeric if COL_TYPES_CACHE.get(sort_by) in ['number', 'integer'] else None, na_position='last')
+            except Exception as sort_err:
+                logger.warning(f"Sort err '{sort_by}': {sort_err}.")
+                query_params_used.pop('_sort', None)
+                query_params_used.pop('_order', None)
+        # Pagination
         limit = parse_int_param(request.args.get('limit'), default=50, min_val=1, max_val=1000)
-        offset = parse_int_param(request.args.get('offset'), default=0, min_val=0, max_val=float('inf')) # Geen praktische max offset
+        offset = parse_int_param(request.args.get('offset'), default=0, min_val=0, max_val=float('inf'))
         query_params_used['limit'] = limit
         query_params_used['offset'] = offset
-        total_results_found = len(df_filtered) # Totaal *voor* paginatie
+        total_results_found = len(df_filtered)
         df_paginated = df_filtered.iloc[offset : offset + limit]
         results_returned = len(df_paginated)
-        # --- Einde Nieuw ---
-
-        # Formatting results
         results_list = df_paginated.reindex(columns=original_columns).where(pd.notna(df_paginated), None).to_dict(orient="records")
+        return jsonify({
+            "status": "success",
+            "query_parameters_used": query_params_used,
+            "pagination": {
+                "offset": offset,
+                "limit": limit,
+                "results_in_this_page": results_returned,
+                "total_results_found": total_results_found
+            },
+            "results": results_list
+        })
+    except Exception as api_err:
+        logger.error(f"API err /api/data: {api_err}", exc_info=True)
+        return jsonify({"error": "Internal server error."}), 500
 
-        return jsonify({ "status": "success", "query_parameters_used": query_params_used, "pagination": {"offset": offset, "limit": limit, "results_in_this_page": results_returned, "total_results_found": total_results_found}, "results": results_list })
-    except Exception as api_err: logger.error(f"API err /api/data/{dataset_slug}: {api_err}", exc_info=True); return jsonify({"error": "Internal server error."}), 500
+@app.route("/data", methods=["GET"])
+def data_shortcut():
+    return api_data_endpoint(dataset_slug=None)
 
+@app.route("/schema", methods=["GET"])
+def schema():
+    global SELECTED_COLS
+    return jsonify({"columns": SELECTED_COLS})
 
 # --- Route: Start Ngrok ---
 # --- Route: Start Ngrok (GECORRIGEERD) ---

@@ -129,6 +129,14 @@
     </div>
 </div>
 
+{% if ngrok_url %}
+    <div class="alert alert-success mt-3">
+        <strong>Public Ngrok URL:</strong> <a href="{{ ngrok_url }}" target="_blank">{{ ngrok_url }}</a>
+        <br>
+        Use this public URL for external access to the API and UI.
+    </div>
+{% endif %}
+
 <div class="mt-5 d-flex justify-content-between">
      <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
        <i class="bi bi-arrow-left me-2"></i>Start Over / Upload New

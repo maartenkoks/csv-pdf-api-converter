@@ -177,3 +177,13 @@ pip install python-dotenv chardet openai werkzeug jinja2
    - **Ongeldige authtoken**: Zorg ervoor dat je een geldige Ngrok authtoken hebt. Je kunt een gratis account aanmaken op [ngrok.com](https://ngrok.com) om een token te krijgen.
    - **Ngrok start niet**: Controleer of poort 5000 niet al in gebruik is door een andere applicatie. Probeer de applicatie te herstarten.
    - **Ngrok tunnel niet gevonden**: Soms duurt het even voordat de tunnel is opgezet. Wacht een paar seconden en probeer het opnieuw.
+
+## Testvoorbeelden
+
+```sh
+curl -F "file=@voorbeeld.json" -F "file_type=json" http://localhost:5000/upload
+curl http://localhost:5000/schema
+curl "http://localhost:5000/data?kolom1=waarde&kolom2=zoekterm&_sort=kolom1&limit=10"
+```
+
+Voor globale toegang: voer ./start_with_ngrok.sh uit, kopieer de getoonde URL en gebruik die in plaats van localhost.

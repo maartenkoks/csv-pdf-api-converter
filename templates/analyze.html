@@ -1,3 +1,4 @@
+{# templates/analyze.html #}
 {% extends "base.html" %}
 
 {% block title %}Analyze Columns & Configure API{% endblock %}
@@ -71,14 +72,19 @@
         <tr>
           <td class="text-center">
             <div class="form-check d-flex justify-content-center">
-              <input class="form-check-input" type="checkbox" name="selected_cols" value="{{ col }}" id="select_{{ loop.index }}"
-                     {% if col in current_selected_cols %}checked{% endif %}>
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="selected_cols"
+                value="{{ col }}"
+                id="select_{{ loop.index }}"
+              >
             </div>
           </td>
-          <td title="{{ col }}"> <!-- Tooltip met volledige naam -->
+          <td title="{{ col }}">
             <label for="select_{{ loop.index }}" style="cursor: pointer;">{{ col }}</label>
           </td>
-          <td class="col-description" title="{{ col_descriptions.get(col, 'No description available.') }}"> <!-- Tooltip met volledige beschrijving -->
+          <td class="col-description" title="{{ col_descriptions.get(col, 'No description available.') }}">
             {% if col_descriptions.get(col) %}
               {{ col_descriptions[col] }}
             {% else %}
@@ -86,12 +92,12 @@
             {% endif %}
           </td>
           <td>
-            <span class="badge bg-info-subtle text-info-emphasis">{{ col_types.get(col, 'Unknown')|capitalize }}</span>
+            <span class="badge bg-info-subtle text-info-emphasis">{{ col_types.get(col, 'Unknown') | capitalize }}</span>
           </td>
-          <td class="col-samples" title="{% if samples.get(col) %}{{ samples.get(col)|join(', ') }}{% else %}No samples{% endif %}"> <!-- Tooltip met alle samples -->
+          <td class="col-samples" title="{% if samples.get(col) %}{{ samples.get(col)|join(', ') }}{% else %}No samples{% endif %}">
             {% if samples.get(col) %}
               {% for val in samples.get(col) %}
-                <span class="badge bg-secondary me-1" title="{{ val }}">{{ val }}</span> {# Tooltip per badge #}
+                <span class="badge bg-secondary me-1" title="{{ val }}">{{ val }}</span>
               {% endfor %}
             {% else %}
               <span class="text-muted small">Leeg</span>
@@ -109,30 +115,43 @@
   <p class="text-muted-light small mb-3">Enable a single search parameter that queries across multiple selected text columns simultaneously.</p>
 
   <div class="form-check form-switch mb-3">
-    <input class="form-check-input" type="checkbox" name="enable_multi_search" id="enable_multi_search" role="switch"
-           {% if current_multi_param_name %}checked{% endif %}>
+    <input
+      class="form-check-input"
+      type="checkbox"
+      name="enable_multi_search"
+      id="enable_multi_search"
+      role="switch"
+    >
     <label class="form-check-label" for="enable_multi_search">Enable multi-column keyword search</label>
   </div>
 
-  {# Toon de volgende opties alleen als multi-search is ingeschakeld (via JS of conditioneel renderen) #}
-  {# Simpelste is om ze altijd te tonen en te negeren in backend als switch uit staat #}
   <div class="row mb-3">
     <div class="col-md-4">
       <label for="multi_param_name_input" class="form-label">Parameter Name (URL)</label>
-      <input type="text" class="form-control" name="multi_param_name" id="multi_param_name_input"
-             value="{{ current_multi_param_name or 'query' }}" placeholder="e.g., 'query'">
+      <input
+        type="text"
+        class="form-control"
+        name="multi_param_name"
+        id="multi_param_name_input"
+        value="{{ 'query' }}"
+        placeholder="e.g., 'query'"
+      >
       <small class="text-muted">The name used in the API URL (e.g., /api?query=...).</small>
     </div>
     <div class="col-md-8">
       <label class="form-label">Columns to Search Across</label>
       <div class="multi-select-container">
           {% for col in all_columns %}
-            {# Alleen 'string' of 'text' kolommen tonen? Of alles? Voor nu alles. #}
             <div class="form-check multi-select-item">
-              <input class="form-check-input" type="checkbox" name="multi_search_target_cols" value="{{ col }}" id="multi_select_{{ loop.index }}"
-                     {% if col in current_multi_selected_cols %}checked{% endif %}>
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="multi_search_target_cols"
+                value="{{ col }}"
+                id="multi_select_{{ loop.index }}"
+              >
               <label class="form-check-label" for="multi_select_{{ loop.index }}">
-                {{ col }} <span class="text-muted small">({{ col_types.get(col, 'Unknown')|capitalize }})</span>
+                {{ col }} <span class="text-muted small">({{ col_types.get(col, 'Unknown') | capitalize }})</span>
               </label>
             </div>
           {% endfor %}
@@ -142,7 +161,9 @@
   </div>
 
   <div class="d-flex justify-content-between mt-5">
-    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-2"></i>Start Over</a>
+    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-2"></i>Start Over
+    </a>
     <button type="submit" class="btn btn-primary btn-lg">
       <i class="bi bi-gear-fill me-2"></i>Apply Configuration & Generate API
     </button>

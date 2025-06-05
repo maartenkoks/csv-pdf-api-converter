@@ -4,12 +4,16 @@ import time
 import pandas as pd
 import requests
 import json
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_from_directory
+import re
+import logging
+from pathlib import Path
+from flask import (
+    Flask, render_template, request, redirect,
+    url_for, jsonify, session, send_from_directory, flash
+)
 from werkzeug.utils import secure_filename
 from robust_csv import robust_csv_cleaner
 from load_json import load_json
-import re
-import logging
 from dotenv import load_dotenv
 from openai import OpenAI, RateLimitError, APIError, AuthenticationError
 
@@ -122,7 +126,7 @@ def generate_column_descriptions_with_llm(context, columns, samples, max_sample_
 # --- Route: Index ---
 @app.route("/")
 def index():
-    global DATAFRAME_STORAGE, SELECTED_COLS, COL_DESCRIPTIONS, MULTI_SEARCH_PARAM_NAME, MULTI_SEARCH_COLS, COL_TYPES_CACHE, COL_SAMPLES_CACHE
+    global DATAFRAME_STORAGE, SELECTED_COLS, COL_DESCRIPTIONS, MULTI_SEARCH_PARAM_NAME, MULTI_SEARCH_COLS, COL_TYPES_CACHE, COL_SAMPLES_CACHE, NGROK_URL
     DATAFRAME_STORAGE = None
     SELECTED_COLS = []
     COL_DESCRIPTIONS = {}
@@ -130,6 +134,7 @@ def index():
     MULTI_SEARCH_COLS = []
     COL_TYPES_CACHE = {}
     COL_SAMPLES_CACHE = {}
+    NGROK_URL = None
     session.clear()
     return render_template("index.html")
 
@@ -138,6 +143,167 @@ def create_slug(filename):
     base_name = os.path.splitext(filename)[0].replace('temp_', '')
     slug = re.sub(r'\W+', '_', base_name).strip('_').lower()
     return slug or "data"
+
+# --- Functie: analyze_columns_for_display ---
+def analyze_columns_for_display(df):
+    global COL_TYPES_CACHE, COL_SAMPLES_CACHE
+    if df is None or df.empty:
+        COL_TYPES_CACHE = {}
+        COL_SAMPLES_CACHE = {}
+        return
+
+    COL_TYPES_CACHE = {}
+    COL_SAMPLES_CACHE = {}
+    for col in df.columns:
+        try:
+            unique_non_null = df[col].dropna().unique()
+            COL_SAMPLES_CACHE[col] = [str(v) for v in unique_non_null[:5]]
+        except Exception as e:
+            logger.warning(f"Unique vals err '{col}': {e}")
+            COL_SAMPLES_CACHE[col] = []
+            unique_non_null = pd.Series([])
+
+        sample_serie = df[col].dropna().head(1000)
+        if sample_serie.empty:
+            COL_TYPES_CACHE[col] = "empty"
+            continue
+
+        # Check boolean
+        possible_bool_map = {
+            "true": True, "1": True, "yes": True, "ja": True, "t": True,
+            "false": False, "0": False, "no": False, "nee": False, "f": False
+        }
+        unique_strs_lower = {
+            str(x).strip().lower()
+            for x in unique_non_null if pd.notna(x)
+        }
+        if unique_strs_lower and unique_strs_lower.issubset(possible_bool_map.keys()):
+            if len({possible_bool_map[s] for s in unique_strs_lower}) <= 2:
+                COL_TYPES_CACHE[col] = "boolean"
+                continue
+
+        # Check numeriek
+        try:
+            numeric_series = pd.to_numeric(sample_serie, errors="coerce")
+            if numeric_series.notna().all():
+                is_close = ((numeric_series - numeric_series.round()).abs() < 1e-9).all()
+                if is_close:
+                    if sample_serie.astype(str).str.match(r"^-?\d+$").all():
+                        COL_TYPES_CACHE[col] = "integer"
+                    else:
+                        COL_TYPES_CACHE[col] = "number"
+                    continue
+                else:
+                    COL_TYPES_CACHE[col] = "number"
+                    continue
+            else:
+                COL_TYPES_CACHE[col] = "string"
+                continue
+        except:
+            COL_TYPES_CACHE[col] = "string"
+            continue
+
+        if col not in COL_TYPES_CACHE:
+            COL_TYPES_CACHE[col] = "string"
+
+# --- Functie: Guess Description ---
+def guess_description(col_name):
+    try:
+        if not isinstance(col_name, str):
+            col_name = str(col_name)
+        original_col_name = col_name
+        c_lower = col_name.lower().strip()
+        if not c_lower:
+            return "Filter by this column (empty name)."
+
+        id_pattern = r"(^id_|_id$|identifier|\Bid\B|_nr$|^nr_)"
+        if re.search(id_pattern, c_lower):
+            base_name = re.sub(id_pattern, "", original_col_name, flags=re.IGNORECASE).strip().strip("_- .")
+            return (
+                f"Filter by unique ID for '{base_name}'."
+                if base_name
+                else f"Filter by unique ID ('{original_col_name}')."
+            )
+
+        if "city" in c_lower or "stad" in c_lower or "plaats" in c_lower or "gemeente" in c_lower:
+            return f"Filter by city/municipality ('{original_col_name}')."
+        if "zip" in c_lower or "postcode" in c_lower or "postal" in c_lower:
+            return f"Filter by postal code ('{original_col_name}')."
+        if "country" in c_lower or "land" in c_lower:
+            return f"Filter by country ('{original_col_name}')."
+        if "region" in c_lower or "provincie" in c_lower or "state" in c_lower or "gewest" in c_lower:
+            return f"Filter by region/province/state ('{original_col_name}')."
+        if "mail" in c_lower:
+            return f"Filter by email ('{original_col_name}')."
+        if "phone" in c_lower or "telefoon" in c_lower or "gsm" in c_lower:
+            return f"Filter by phone number ('{original_col_name}')."
+        if "url" in c_lower or "website" in c_lower or "link" in c_lower:
+            return f"Filter by URL/website ('{original_col_name}')."
+        if (
+            "date" in c_lower
+            or "datum" in c_lower
+            or "_dt" in c_lower
+            or c_lower.endswith("day")
+            or "time" in c_lower
+            or "stamp" in c_lower
+            or "jaar" in c_lower
+            or "year" in c_lower
+            or "maand" in c_lower
+            or "month" in c_lower
+        ):
+            return f"Filter by date/time ('{original_col_name}')."
+        if (
+            "wage" in c_lower
+            or "loon" in c_lower
+            or "salaris" in c_lower
+            or "salary" in c_lower
+            or "amount" in c_lower
+            or "price" in c_lower
+            or "value" in c_lower
+            or "waarde" in c_lower
+            or "bedrag" in c_lower
+            or "cost" in c_lower
+        ):
+            return f"Filter by amount/price/wage ('{original_col_name}')."
+        if "nummer" in c_lower or "number" in c_lower or "count" in c_lower or "aantal" in c_lower:
+            return f"Filter by number/count ('{original_col_name}')."
+        if "min" in c_lower:
+            return f"Filter by minimum value ('{original_col_name}')."
+        if "max" in c_lower:
+            return f"Filter by maximum value ('{original_col_name}')."
+        if "status" in c_lower or ("state" in c_lower and "status" in c_lower):
+            return f"Filter by status/state ('{original_col_name}')."
+        if "type" in c_lower or "soort" in c_lower:
+            return f"Filter by type ('{original_col_name}')."
+        if "lang" in c_lower or "taal" in c_lower:
+            return f"Filter by language ('{original_col_name}')."
+        if "code" in c_lower:
+            return f"Filter by code ('{original_col_name}')."
+        if "category" in c_lower or "categorie" in c_lower:
+            return f"Filter by category ('{original_col_name}')."
+        if "title" in c_lower or "titel" in c_lower:
+            return f"Filter by title ('{original_col_name}')."
+        if "desc" in c_lower or "omschr" in c_lower or "text" in c_lower or "tekst" in c_lower:
+            return f"Filter by description/text ('{original_col_name}')."
+        if "name" in c_lower or "naam" in c_lower:
+            return f"Filter by name ('{original_col_name}')."
+        if c_lower == "y" or c_lower == "n" or "flag" in c_lower or c_lower.startswith("is_") or c_lower.startswith("has_") or "publish" in c_lower:
+            return f"Filter by boolean flag ('{original_col_name}')."
+        return f"Filter by value in '{original_col_name}'."
+    except Exception as e:
+        logger.error(f"Guess desc error '{col_name}': {e}")
+        return f"Filter by value in '{col_name}'."
+
+# --- Hulpfunctie: Parse Integer Parameter ---
+def parse_int_param(param_value, default, min_val, max_val):
+    """Parses an integer parameter, clamps it, and returns default on error."""
+    if param_value is None:
+        return default
+    try:
+        val = int(param_value)
+        return max(min_val, min(val, max_val))
+    except (ValueError, TypeError):
+        return default
 
 # --- Route: Upload (CSV, PDF, JSON) ---
 @app.route("/upload", methods=["POST"])
@@ -172,7 +338,6 @@ def upload_file():
                 logger.warning(f"CSV cleaner empty DF: {temp_path}.")
 
             DATAFRAME_STORAGE = df
-            logger.info(f"DataFrame loaded: {DATAFRAME_STORAGE.shape}")
             COL_TYPES_CACHE = {}
             COL_SAMPLES_CACHE = {}
             SELECTED_COLS = []
@@ -289,69 +454,6 @@ def upload_file():
         logger.warning(f"Invalid file type: {file_type}")
         return redirect(url_for("index"))
 
-
-# --- Functie: analyze_columns_for_display ---
-def analyze_columns_for_display(df):
-    global COL_TYPES_CACHE, COL_SAMPLES_CACHE
-    if df is None or df.empty:
-        COL_TYPES_CACHE = {}
-        COL_SAMPLES_CACHE = {}
-        return
-
-    COL_TYPES_CACHE = {}
-    COL_SAMPLES_CACHE = {}
-    for col in df.columns:
-        try:
-            unique_non_null = df[col].dropna().unique()
-            COL_SAMPLES_CACHE[col] = [str(v) for v in unique_non_null[:5]]
-        except Exception as e:
-            logger.warning(f"Unique vals err '{col}': {e}")
-            COL_SAMPLES_CACHE[col] = []
-            unique_non_null = pd.Series([])
-
-        sample_serie = df[col].dropna().head(1000)
-        if sample_serie.empty:
-            COL_TYPES_CACHE[col] = "empty"
-            continue
-
-        # Check boolean
-        possible_bool_map = {
-            "true": True, "1": True, "yes": True, "ja": True, "t": True,
-            "false": False, "0": False, "no": False, "nee": False, "f": False
-        }
-        unique_strs_lower = {
-            str(x).strip().lower()
-            for x in unique_non_null if pd.notna(x)
-        }
-        if unique_strs_lower and unique_strs_lower.issubset(possible_bool_map.keys()):
-            if len({possible_bool_map[s] for s in unique_strs_lower}) <= 2:
-                COL_TYPES_CACHE[col] = "boolean"
-                continue
-
-        # Check numeriek
-        try:
-            numeric_series = pd.to_numeric(sample_serie, errors="coerce")
-            if numeric_series.notna().all():
-                is_close = ((numeric_series - numeric_series.round()).abs() < 1e-9).all()
-                if is_close:
-                    if sample_serie.astype(str).str.match(r"^-?\d+$").all():
-                        COL_TYPES_CACHE[col] = "integer"
-                    else:
-                        COL_TYPES_CACHE[col] = "number"
-                    continue
-                else:
-                    COL_TYPES_CACHE[col] = "number"
-                    continue
-            else:
-                COL_TYPES_CACHE[col] = "string"
-                continue
-        except:
-            COL_TYPES_CACHE[col] = "string"
-            continue
-
-        if col not in COL_TYPES_CACHE:
-            COL_TYPES_CACHE[col] = "string"
-
 # --- Route: Analyze (CSV & JSON) ---
 @app.route("/analyze")
 def analyze():
@@ -454,105 +556,6 @@ def generate_api():
         multi_search_cols=MULTI_SEARCH_COLS,
         multi_col_details=multi_col_details
     )
-
-# --- Functie: Guess Description ---
-def guess_description(col_name):
-    try:
-        if not isinstance(col_name, str):
-            col_name = str(col_name)
-        original_col_name = col_name
-        c_lower = col_name.lower().strip()
-        if not c_lower:
-            return "Filter by this column (empty name)."
-
-        id_pattern = r"(^id_|_id$|identifier|\Bid\B|_nr$|^nr_)"
-        if re.search(id_pattern, c_lower):
-            base_name = re.sub(id_pattern, "", original_col_name, flags=re.IGNORECASE).strip().strip("_- .")
-            return (
-                f"Filter by unique ID for '{base_name}'."
-                if base_name
-                else f"Filter by unique ID ('{original_col_name}')."
-            )
-
-        if "city" in c_lower or "stad" in c_lower or "plaats" in c_lower or "gemeente" in c_lower:
-            return f"Filter by city/municipality ('{original_col_name}')."
-        if "zip" in c_lower or "postcode" in c_lower or "postal" in c_lower:
-            return f"Filter by postal code ('{original_col_name}')."
-        if "country" in c_lower or "land" in c_lower:
-            return f"Filter by country ('{original_col_name}')."
-        if "region" in c_lower or "provincie" in c_lower or "state" in c_lower or "gewest" in c_lower:
-            return f"Filter by region/province/state ('{original_col_name}')."
-        if "mail" in c_lower:
-            return f"Filter by email ('{original_col_name}')."
-        if "phone" in c_lower or "telefoon" in c_lower or "gsm" in c_lower:
-            return f"Filter by phone number ('{original_col_name}')."
-        if "url" in c_lower or "website" in c_lower or "link" in c_lower:
-            return f"Filter by URL/website ('{original_col_name}')."
-        if (
-            "date" in c_lower
-            or "datum" in c_lower
-            or "_dt" in c_lower
-            or c_lower.endswith("day")
-            or "time" in c_lower
-            or "stamp" in c_lower
-            or "jaar" in c_lower
-            or "year" in c_lower
-            or "maand" in c_lower
-            or "month" in c_lower
-        ):
-            return f"Filter by date/time ('{original_col_name}')."
-        if (
-            "wage" in c_lower
-            or "loon" in c_lower
-            or "salaris" in c_lower
-            or "salary" in c_lower
-            or "amount" in c_lower
-            or "price" in c_lower
-            or "value" in c_lower
-            or "waarde" in c_lower
-            or "bedrag" in c_lower
-            or "cost" in c_lower
-        ):
-            return f"Filter by amount/price/wage ('{original_col_name}')."
-        if "nummer" in c_lower or "number" in c_lower or "count" in c_lower or "aantal" in c_lower:
-            return f"Filter by number/count ('{original_col_name}')."
-        if "min" in c_lower:
-            return f"Filter by minimum value ('{original_col_name}')."
-        if "max" in c_lower:
-            return f"Filter by maximum value ('{original_col_name}')."
-        if "status" in c_lower or ("state" in c_lower and "status" in c_lower):
-            return f"Filter by status/state ('{original_col_name}')."
-        if "type" in c_lower or "soort" in c_lower:
-            return f"Filter by type ('{original_col_name}')."
-        if "lang" in c_lower or "taal" in c_lower:
-            return f"Filter by language ('{original_col_name}')."
-        if "code" in c_lower:
-            return f"Filter by code ('{original_col_name}')."
-        if "category" in c_lower or "categorie" in c_lower:
-            return f"Filter by category ('{original_col_name}')."
-        if "title" in c_lower or "titel" in c_lower:
-            return f"Filter by title ('{original_col_name}')."
-        if "desc" in c_lower or "omschr" in c_lower or "text" in c_lower or "tekst" in c_lower:
-            return f"Filter by description/text ('{original_col_name}')."
-        if "name" in c_lower or "naam" in c_lower:
-            return f"Filter by name ('{original_col_name}')."
-        if c_lower == "y" or c_lower == "n" or "flag" in c_lower or c_lower.startswith("is_") or c_lower.startswith("has_") or "publish" in c_lower:
-            return f"Filter by boolean flag ('{original_col_name}')."
-        return f"Filter by value in '{original_col_name}'."
-    except Exception as e:
-        logger.error(f"Guess desc error '{col_name}': {e}")
-        return f"Filter by value in '{col_name}'."
-
-# --- Hulpfunctie: Parse Integer Parameter ---
-def parse_int_param(param_value, default, min_val, max_val):
-    """Parses an integer parameter, clamps it, and returns default on error."""
-    if param_value is None:
-        return default
-    try:
-        val = int(param_value)
-        return max(min_val, min(val, max_val))
-    except (ValueError, TypeError):
-        return default
 
 # --- API Endpoint: /api/data/<slug> ---
 @app.route("/api/data/<string:dataset_slug>", methods=["GET"])
@@ -672,7 +675,7 @@ def schema():
         return jsonify({"error": "No data currently loaded."}), 400
     return jsonify({"columns": SELECTED_COLS})
 
-# --- Route: Start Ngrok ---
+# --- Route: Start Ngrok (GET en POST) ---
 @app.route("/start_ngrok", methods=["GET", "POST"])
 def start_ngrok():
     global NGROK_PROCESS, NGROK_URL
@@ -685,7 +688,7 @@ def start_ngrok():
 
         ngrok_cmd = "ngrok.exe" if os.name == "nt" else "ngrok"
 
-        # --- Try: Configureer token ---
+        # 1) Configureer het token
         try:
             logger.info("Configuring Ngrok authtoken...")
             result = subprocess.run(
@@ -712,7 +715,7 @@ def start_ngrok():
             session["ngrok_error"] = f"Unexpected token error: {e}"
             return redirect(url_for("start_ngrok"))
 
-        # Stop eventueel oude tunnel
+        # 2) Indien al een tunnel draaide, stop die eerst netjes
         if NGROK_PROCESS and NGROK_PROCESS.poll() is None:
             try:
                 logger.info("Terminating previous Ngrok process...")
@@ -728,9 +731,9 @@ def start_ngrok():
                 NGROK_URL = None
 
         NGROK_URL = None
-        time.sleep(0.5)
+        time.sleep(0.5)  # even kort pauzeren zodat de poort 4040 herstart kan afhandelen
 
-        # --- Try: Start nieuwe ngrok tunnel ---
+        # 3) Start de nieuwe ngrok-tunnel
         try:
             logger.info("Starting Ngrok HTTP tunnel on port 5000...")
             startupinfo = None
@@ -747,9 +750,10 @@ def start_ngrok():
                 startupinfo=startupinfo
             )
             logger.info(f"Started Ngrok process (PID: {NGROK_PROCESS.pid})")
-            time.sleep(4)
+            time.sleep(4)  # wachttijd om de tunnel op te zetten
 
             if NGROK_PROCESS.poll() is not None:
+                # Ngrok is plots gestopt in plaats van succesvol te runnen
                 stderr_output = NGROK_PROCESS.stderr.read()
                 stdout_output = NGROK_PROCESS.stdout.read()
                 error_msg = f"Ngrok terminated unexpectedly. Stderr:{stderr_output or 'N/A'} Stdout:{stdout_output or 'N/A'}"
@@ -758,7 +762,7 @@ def start_ngrok():
                 NGROK_PROCESS = None
                 return redirect(url_for("start_ngrok"))
 
-            # --- Geïntegreerde API-call om tunnel-URL te krijgen ---
+            # 4) Haal de publieke URL op via de lokale API van ngrok
             try:
                 logger.info("Fetching tunnel URL from Ngrok API...")
                 resp = requests.get("http://127.0.0.1:4040/api/tunnels", timeout=10)
@@ -766,22 +770,25 @@ def start_ngrok():
                 tunnels = resp.json().get("tunnels", [])
                 logger.debug(f"Ngrok tunnels response: {tunnels}")
                 https_tunnel = next(
-                    (t for t in tunnels
-                     if t.get("proto") == "https"
-                     and "localhost:5000" in t.get("config", {}).get("addr", "")),
+                    (tunnel for tunnel in tunnels
+                     if tunnel.get("proto") == "https"
+                     and "localhost:5000" in tunnel.get("config", {}).get("addr", "")),
                     None
                 )
                 if https_tunnel and https_tunnel.get("public_url"):
                     NGROK_URL = https_tunnel["public_url"]
                     logger.info(f"Ngrok tunnel URL: {NGROK_URL}")
                     session.pop("ngrok_error", None)
+
+                    # 5) Redirect naar de correcte “generate-pagina” op basis van bestandstype
                     file_type = session.get("file_type")
                     if file_type == "pdf":
                         return redirect(url_for("generate_pdf"))
-                    elif file_type == "csv":
+                    elif file_type in ["csv", "json"]:
+                        # zowel CSV als JSON leiden naar dezelfde generate_api-pagina
                         return redirect(url_for("generate_api"))
                     else:
-                        logger.warning(f"Ngrok started, unknown file_type '{file_type}'. Redirecting to index.")
+                        logger.warning(f"Ngrok gestart, maar onbekend file_type '{file_type}'. Redirecting to index.")
                         return redirect(url_for("index"))
                 else:
                     logger.error(f"HTTPS tunnel to localhost:5000 not found in {tunnels}")
@@ -812,7 +819,7 @@ def start_ngrok():
             NGROK_URL = None
             return redirect(url_for("start_ngrok"))
 
-    # GET request of render na fouten
+    # Bij een GET-request of als er een fout in de POST optrad, render de setup-pagina
     ngrok_error = session.pop("ngrok_error", None)
     return render_template("start_ngrok.html", ngrok_error=ngrok_error)
 
